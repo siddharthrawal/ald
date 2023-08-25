@@ -1,0 +1,95 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Serverless patterns - Amazon API Gateway to AWS Lambda to Amazon DynamoDB
+Parameters:
+  DynamoDBTableName:
+    Type: String
+    Description: Name of the DynamoDB table
+    Default: WeatherData
+Resources:
+  MyRestApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Auth:
+        DefaultAuthorizer: MyLambdaTokenAuthorizer
+        Authorizers:
+          MyLambdaTokenAuthorizer:
+            FunctionArn: !GetAtt MyLambdaAuthorizerFunction.Arn
+      Cors:
+        AllowMethods: "'OPTIONS,GET,POST,DELETE'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'"
+        AllowOrigin: "'*'"
+  LambdaFunction:
+    Type: AWS::Serverless::Function
+    Description: 'Lambda function inserts data into DynamoDB table'
+    Properties:
+      FunctionName: WeatherFunction
+      Handler: src.index.lambda_handler
+      Runtime: python3.9
+      CodeUri: s3://caci-code/code.zip
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DynamoDBTable
+      Environment:
+        Variables:
+          DYNAMODB_TABLE: !Ref DynamoDBTable
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /
+            Method: POST
+            RestApiId: !Ref MyRestApi
+
+  DeleteLambdaFunction:
+    Type: AWS::Serverless::Function
+    Description: 'Lambda function deletes Weather data from DynamoDB table'
+    Properties:
+      FunctionName: DeleteWeatherFunction
+      Handler: src.delete_weather.lambda_handler
+      Runtime: python3.9
+      CodeUri: s3://caci-code/code.zip
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DynamoDBTable
+      Environment:
+        Variables:
+          DYNAMODB_TABLE: !Ref DynamoDBTable
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /{id}
+            Method: DELETE
+            RestApiId: !Ref MyRestApi
+
+  MyLambdaAuthorizerFunction:
+    Type: AWS::Serverless::Function
+    Description: 'Lambda function that authorizes requests to the API'
+    Properties:
+      FunctionName: MyLambdaAuthorizerFunction
+      Handler: src.token_authorizer.lambda_handler  # Change to your actual authorizer handler
+      Runtime: python3.9
+      CodeUri: s3://caci-code/code.zip  # Change to your authorizer code location
+      Policies:
+        - AWSLambdaBasicExecutionRole
+      Environment:
+        Variables:
+          ALLOWED_TOKEN: "allowme"
+
+  DynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref DynamoDBTableName 
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      DeletionProtectionEnabled: true  # Retain the table when the stack is deleted
+

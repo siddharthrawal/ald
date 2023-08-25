@@ -1,0 +1,7 @@
+MSG_01 = "Missing 'id' field. Field is required"
+MSG_02 = "Missing 'weather' field. Field is required"
+MSG_03 = "Invalid attribute:{attr}"
+MSG_04 = "Data inserted successfully"
+MSG_05 = "Error inserting data: {e}"
+MSG_06 = "Record deleted successfully"
+MSG_07 = "Error in deleting the api"
